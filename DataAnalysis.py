@@ -607,6 +607,22 @@ class AnalysisApp(Tkinter.Frame):
 		worksheet.set_column(0,0,2.5)
 		worksheet.set_column(1,1,18)
 		worksheet.set_column(2,7,6.8)
+		
+		# compute avg and write to xlsx
+		threshold = 0.30
+		total_view_no = rel_trans_err.shape[0]
+		ind = (rel_angle_err > threshold).sum(axis=1) + (rel_trans_err > threshold).reshape(total_view_no)
+		ind = (ind < 1).nonzero()
+		in_thres_view_no = ind[0].shape[0]
+		in_thres_angle_err = rel_angle_err[ind]
+		in_thres_trans_err = rel_trans_err[ind]
+			
+		avg_angle_err = in_thres_angle_err.sum(axis = 0)/in_thres_view_no
+		avg_trans_err = in_thres_trans_err.sum()/in_thres_view_no
+	
+		worksheet.write_row(0, 8, avg_angle_err, highlight_re_format)
+		worksheet.write(0, 11, avg_angle_err.sum()/3.0, highlight_re_format)
+		worksheet.write(1, 8, avg_trans_err, highlight_re_format)
 		workbook.close()
 
 	def write2xlsx_v1(self, fliename, exp_acc_angle, the_acc_angle, exp_dist, the_dist):
@@ -692,9 +708,15 @@ class AnalysisApp(Tkinter.Frame):
 		the_other_position = the_acc_trans[1:]
 		exp_other_position = exp_acc_trans[1:]
 		
-		err_other_position = np.abs(the_other_position - exp_other_position)
-		err_other_position = err_other_position ** 2
-		err_other_position = np.sqrt(err_other_position.sum(axis=1))/np.sqrt((the_init_position**2).sum())
+		err_other_position = (the_other_position- exp_other_position) ** 2
+		err_other_position = np.sqrt(err_other_position.sum(axis=1))/np.sqrt((the_other_position**2).sum(axis=1))
+		
+		inf_ind = (err_other_position > 1).nonzero()[0]
+		err_other_position[inf_ind] = 1
+		
+		norm_ind = (~(err_other_position > 0.3)).nonzero()[0]
+		in_sample = err_other_position[norm_ind]
+		avg_trans_err = in_sample.sum()/ in_sample.shape[0]
 		
 		# Create an new Excel file and add a worksheet.
 		workbook = xlsxwriter.Workbook(fliename)
@@ -781,6 +803,24 @@ class AnalysisApp(Tkinter.Frame):
 		worksheet.set_column(0,0,2.5)
 		worksheet.set_column(1,1,18)
 		worksheet.set_column(2,7,6.8)
+		
+		# compute avg err and write to xlsx
+		_in = the_acc_angle == 0.0
+		_in = _in.sum(axis = 1).nonzero()[0]
+		no = the_acc_angle.shape[0]
+		no_set = set(range(0,no))
+		no_set = no_set - set(_in)
+		no_in = list(no_set)
+		sample_the_acc_angle = the_acc_angle[no_in]
+		sample_exp_acc_angle = exp_acc_angle[no_in]
+		angle_err = np.abs((sample_the_acc_angle - sample_exp_acc_angle)/sample_the_acc_angle)
+		in_thres_view_no = len(no_in)
+		avg_angle_err = angle_err.sum(axis = 0)/in_thres_view_no
+	
+		worksheet.write_row(0, 8, avg_angle_err, highlight_re_format)
+		worksheet.write(0, 11, avg_angle_err.sum()/3.0, highlight_re_format)
+		worksheet.write(1, 8, avg_trans_err, highlight_re_format)		
+		
 		workbook.close()
 		
 if __name__=='__main__':
